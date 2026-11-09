@@ -3,9 +3,9 @@ import hashlib
 import hmac
 import secrets
 
-from psycopg import Connection
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pymysql.connections import Connection
 
 from database import get_db
 
@@ -40,11 +40,13 @@ def get_current_user(
     """Devuelve el usuario dueño del token Bearer o responde 401."""
     if credenciales is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Falta el token")
-    usuario = db.execute(
-        "SELECT u.* FROM usuarios u JOIN sesiones s ON s.usuario_id = u.id "
-        "WHERE s.token = %s",
-        (credenciales.credentials,),
-    ).fetchone()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT u.* FROM usuarios u JOIN sesiones s ON s.usuario_id = u.id "
+            "WHERE s.token = %s",
+            (credenciales.credentials,),
+        )
+        usuario = cur.fetchone()
     if usuario is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Token inválido")
     return usuario
